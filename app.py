@@ -237,9 +237,13 @@ if gemini_key:
         parsed = st.session_state.agent.parse_schedule(reply)
         if parsed:
             st.session_state.ai_schedule = parsed
-            display_reply = parsed.get("summary", "Here is your schedule!")
+            display_reply = parsed.get("summary", "Schedule generated — see the table below.")
         else:
-            display_reply = reply
+            # Never show raw JSON in the chat bubble
+            if reply.strip().startswith("{") or "```" in reply:
+                display_reply = "Schedule generated — see the table below."
+            else:
+                display_reply = reply
 
         st.session_state.chat_history.append({"role": "assistant", "content": display_reply})
         with st.chat_message("assistant"):

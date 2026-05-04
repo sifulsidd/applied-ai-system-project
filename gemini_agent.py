@@ -1,5 +1,6 @@
 from __future__ import annotations
 import json
+import re
 from google import genai
 from google.genai import types
 from pawpal_system import Owner
@@ -109,13 +110,12 @@ class PawPalAgent:
 
     def parse_schedule(self, reply: str) -> dict | None:
         """Try to parse a JSON schedule out of the reply. Returns None if not JSON."""
-        text = reply.strip()
-        # Strip markdown code fences if the model wrapped the JSON
-        if text.startswith("```"):
-            lines = text.splitlines()
-            text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+        # Extract the first {...} block from the reply, ignoring surrounding text or fences
+        match = re.search(r'\{.*\}', reply, re.DOTALL)
+        if not match:
+            return None
         try:
-            data = json.loads(text)
+            data = json.loads(match.group())
             if "schedule" in data:
                 return data
         except (json.JSONDecodeError, ValueError):

@@ -224,3 +224,7 @@ Building PawPal+ taught me that AI is most useful when it handles the parts of a
 The biggest lesson was about prompt engineering as system design. The system prompt in `gemini_agent.py` is not just instructions — it is the contract between the application and the model. Getting the redistribution logic, JSON output format, and conflict reasoning right in the prompt took iteration, and changes to it affected behavior in non-obvious ways. Treating the prompt as code — versioned, tested against expected outputs, and kept minimal — is the right approach.
 
 Working on this project also reinforced that AI tools augment judgment rather than replace it. Every AI-generated schedule in this system is reviewed by a human before being acted on. That human checkpoint is not a limitation — it is the correct architecture for a system where the stakes (a pet's health routine) require the owner to stay in the loop.
+
+
+## Loom Link
+https://www.loom.com/share/c6d0ec0a4a984e5586be612abc5dd437
