@@ -228,3 +228,6 @@ Working on this project also reinforced that AI tools augment judgment rather th
 
 ## Loom Link
 https://www.loom.com/share/c6d0ec0a4a984e5586be612abc5dd437
+
+## Reflection
+My project is to help pet owners schedule activities that they can't seem to juggle. This project says that I'm an engineer who is aware of pet owners struggles and constantly looking for solutions in order to alleviate this. 
