@@ -257,18 +257,28 @@ if gemini_key:
         items = sched.get("schedule", [])
         if items:
             priority_icon = {"high": "🔴", "medium": "🟡", "low": "🟢"}
+            confidence_icon = {"high": "🟢", "medium": "🟡", "low": "🔴"}
             table_rows = []
             for item in items:
-                icon = priority_icon.get(item.get("priority", "medium"), "🟡")
+                p_icon = priority_icon.get(item.get("priority", "medium"), "🟡")
+                conf_score = item.get("confidence", "?")
+                conf_label = item.get("confidence_label", "").lower()
+                c_icon = confidence_icon.get(conf_label, "⚪")
                 table_rows.append({
                     "Time": item.get("time", ""),
                     "Pet": item.get("pet", ""),
                     "Task": item.get("task", ""),
-                    "Priority": f"{icon} {item.get('priority', 'medium').capitalize()}",
+                    "Priority": f"{p_icon} {item.get('priority', 'medium').capitalize()}",
                     "Duration (mins)": item.get("duration_mins", ""),
+                    "Confidence": f"{c_icon} {conf_score}% ({conf_label.capitalize() if conf_label else '?'})",
                     "Why": item.get("reason", ""),
                 })
             st.table(table_rows)
+            st.caption(
+                "🟢 High confidence (75–100%): clean fit · "
+                "🟡 Medium (40–74%): redistributed or near a boundary · "
+                "🔴 Low (0–39%): placement uncertain"
+            )
 
         if sched.get("conflicts"):
             st.markdown("#### Conflicts")
