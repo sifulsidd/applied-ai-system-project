@@ -1,5 +1,10 @@
+import os
 import streamlit as st
+from dotenv import load_dotenv
 from pawpal_system import Task, Pet, Owner, Scheduler
+from gemini_agent import PawPalAgent
+
+load_dotenv()
 
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
 
@@ -147,26 +152,22 @@ st.divider()
 st.subheader("Build Schedule")
 st.caption("Sorts all tasks chronologically and checks for scheduling conflicts.")
 
-# UPDATED: Replaced the placeholder warning with real scheduling and conflict detection logic.
+# Rule-based schedule (original behaviour)
 if st.button("Generate schedule"):
     if "owner" not in st.session_state or "scheduler" not in st.session_state:
         st.warning("Please set an owner first.")
     else:
         owner = st.session_state.owner
         scheduler = st.session_state.scheduler
-        # Retrieve all tasks across every pet owned by this owner
         all_tasks = scheduler.get_all_tasks(owner)
 
         if not all_tasks:
             st.warning("No tasks to schedule. Add tasks above.")
         else:
-            # --- Sorted Schedule ---
             st.markdown("#### Sorted Schedule")
-            # sort_by_time() parses each task's time string and returns them in order
             sorted_tasks = scheduler.sort_by_time(all_tasks)
             for task in sorted_tasks:
                 status = "✅ Done" if task.completed else "⏳ Pending"
-                # Color-coded priority dot displayed inline with each task row
                 priority_color = {"high": "🔴", "medium": "🟡", "low": "🟢"}.get(task.priority, "")
                 st.markdown(
                     f"**{task.time}** — {task.description} "
@@ -176,14 +177,110 @@ if st.button("Generate schedule"):
 
             st.divider()
 
-            # --- Conflict Detection ---
             st.markdown("#### Conflict Detection")
-            # detect_conflicts() checks every task pair for overlapping time windows
             conflicts = scheduler.detect_conflicts(owner)
             if conflicts:
-                # Each conflict string is shown as a st.warning banner
                 for warning in conflicts:
                     st.warning(warning)
             else:
-                # Green success banner confirms the schedule is clean
                 st.success("No scheduling conflicts found.")
+
+st.divider()
+
+# ---------------------------------------------------------------------------
+# AI Schedule Assistant (Gemini)
+# ---------------------------------------------------------------------------
+st.subheader("AI Schedule Assistant")
+st.caption(
+    "Chat with PawPal+ to describe your day and let the AI build a personalised schedule for your pet(s)."
+)
+
+gemini_key = os.getenv("GEMINI_API_KEY") or st.text_input(
+    "Gemini API key", type="password", help="Your Google AI Studio API key (or set GEMINI_API_KEY in .env)"
+)
+
+if gemini_key:
+    # Initialise the agent once per session (or when the key changes)
+    if "agent" not in st.session_state or st.session_state.get("agent_key") != gemini_key:
+        st.session_state.agent = PawPalAgent(api_key=gemini_key)
+        st.session_state.agent_key = gemini_key
+        st.session_state.chat_history = []
+        st.session_state.ai_schedule = None
+
+    # Render conversation history
+    for msg in st.session_state.chat_history:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+
+    # Kick off the conversation automatically if chat is empty
+    if not st.session_state.chat_history:
+        owner = st.session_state.get("owner")
+        opening = st.session_state.agent.send_message(
+            "Hello! Please start the conversation to build my pet schedule.",
+            owner=owner,
+        )
+        st.session_state.chat_history.append({"role": "assistant", "content": opening})
+        with st.chat_message("assistant"):
+            st.markdown(opening)
+
+    # User input
+    user_input = st.chat_input("Type your reply…")
+    if user_input:
+        st.session_state.chat_history.append({"role": "user", "content": user_input})
+        with st.chat_message("user"):
+            st.markdown(user_input)
+
+        owner = st.session_state.get("owner")
+        reply = st.session_state.agent.send_message(user_input, owner=owner)
+
+        # Check whether the agent returned a JSON schedule
+        parsed = st.session_state.agent.parse_schedule(reply)
+        if parsed:
+            st.session_state.ai_schedule = parsed
+            display_reply = parsed.get("summary", "Here is your schedule!")
+        else:
+            display_reply = reply
+
+        st.session_state.chat_history.append({"role": "assistant", "content": display_reply})
+        with st.chat_message("assistant"):
+            st.markdown(display_reply)
+
+    # Render the AI-generated schedule if one exists
+    if st.session_state.get("ai_schedule"):
+        sched = st.session_state.ai_schedule
+        st.divider()
+        st.subheader("AI-Generated Schedule")
+
+        if sched.get("summary"):
+            st.info(sched["summary"])
+
+        items = sched.get("schedule", [])
+        if items:
+            priority_icon = {"high": "🔴", "medium": "🟡", "low": "🟢"}
+            table_rows = []
+            for item in items:
+                icon = priority_icon.get(item.get("priority", "medium"), "🟡")
+                table_rows.append({
+                    "Time": item.get("time", ""),
+                    "Pet": item.get("pet", ""),
+                    "Task": item.get("task", ""),
+                    "Priority": f"{icon} {item.get('priority', 'medium').capitalize()}",
+                    "Duration (mins)": item.get("duration_mins", ""),
+                    "Why": item.get("reason", ""),
+                })
+            st.table(table_rows)
+
+        if sched.get("conflicts"):
+            st.markdown("#### Conflicts")
+            for c in sched["conflicts"]:
+                st.warning(c)
+        else:
+            st.success("No scheduling conflicts.")
+
+        if st.button("Reset AI chat"):
+            st.session_state.agent.reset()
+            st.session_state.chat_history = []
+            st.session_state.ai_schedule = None
+            st.rerun()
+else:
+    st.info("Enter your Gemini API key above to enable the AI assistant.")
